@@ -40,6 +40,7 @@ const Report = () => {
   const [shopForm, setShopForm]         = useState(shopDetails)
 
   // Load shop details
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     API.get('/config/shop')
       .then(res => {
@@ -48,7 +49,7 @@ const Report = () => {
       })
       .catch(() => {})
   }, [])
-
+// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { 
     if (date) fetchReport() 
   }, [date])
@@ -356,7 +357,7 @@ const getValuePerCase = () => {
   })
 
   const pageW = doc.internal.pageSize.getWidth()
-  const pageH = doc.internal.pageSize.getHeight()
+//   const pageH = doc.internal.pageSize.getHeight()
 
   const dateStr = new Date(date + 'T00:00:00')
     .toLocaleDateString('en-IN', {
