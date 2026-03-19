@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const API = axios.create({
-  baseURL: 'https://supervisor-management-production.up.railway.app/api'
+  baseURL: 'https://supervisor-management.onrender.com/api'
 })
 
 API.interceptors.request.use((config) => {
