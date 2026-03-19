@@ -39,8 +39,7 @@ const Report = () => {
   const [editingShop, setEditingShop]   = useState(false)
   const [shopForm, setShopForm]         = useState(shopDetails)
 
-  // Load shop details
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   useEffect(() => {
     API.get('/config/shop')
       .then(res => {
@@ -49,11 +48,9 @@ const Report = () => {
       })
       .catch(() => {})
   }, [])
-// eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { 
-    if (date) fetchReport() 
-  }, [date])
 
+  
+useEffect(() => {
   const fetchReport = async () => {
     try {
       setLoading(true)
@@ -63,17 +60,18 @@ const Report = () => {
       const editable = {}
       res.data.stock.forEach(entry => {
         editable[entry._id] = {
-          openingStock:   entry.openingStock   || 0,
-          totalReceived:  entry.totalReceived  || 0,
+          openingStock: entry.openingStock || 0,
+          totalReceived: entry.totalReceived || 0,
           totalAvailable: entry.totalAvailable || 0,
-          salesBottles:   entry.salesBottles   || 0,
-          salesValue:     entry.salesValue     || 0,
-          cbbo:           entry.cbbo           || 0,
-          closingCases:   entry.closingCases   || 0,
+          salesBottles: entry.salesBottles || 0,
+          salesValue: entry.salesValue || 0,
+          cbbo: entry.cbbo || 0,
+          closingCases: entry.closingCases || 0,
           closingBottles: entry.closingBottles || 0,
-          closingValue:   entry.closingValue   || 0,
+          closingValue: entry.closingValue || 0,
         }
       })
+
       setEditableStock(editable)
       setPosAmount('')
       setCashAmount('')
@@ -86,6 +84,9 @@ const Report = () => {
       setLoading(false)
     }
   }
+
+  if (date) fetchReport()
+}, [date])
 
   const handleCellEdit = (entryId, field, value) => {
     const num = Number(value) || 0
