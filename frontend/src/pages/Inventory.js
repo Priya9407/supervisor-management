@@ -21,8 +21,12 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // Filter + Search states
+  const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("ALL");
   const [filterSize, setFilterSize] = useState("ALL");
+  const [filterSubCategory, setFilterSubCategory] = useState("ALL");
 
   // Form state
   const emptyForm = {
@@ -53,14 +57,11 @@ const Inventory = () => {
           API.get("/config?type=beerType"),
         ]);
       setProducts(productsRes.data);
-      console.log("Products:", productsRes.data);
-      console.log("Sizes:", sizesRes.data);
       setSizes(sizesRes.data);
       setSpiritTypes(spiritRes.data);
       setPriceCategories(priceRes.data);
       setBeerTypes(beerRes.data);
     } catch (error) {
-      // Show exact error
       console.error("Full error:", error);
       console.error("Response:", error.response?.data);
       toast.error(
@@ -70,6 +71,7 @@ const Inventory = () => {
       setLoading(false);
     }
   };
+
   const handleSizeChange = (sizeValue) => {
     const selectedSize = sizes.find((s) => s.value === sizeValue);
     setForm((prev) => ({
@@ -97,7 +99,7 @@ const Inventory = () => {
       size: product.size,
       bottlesPerCase: product.bottlesPerCase,
       govtCode: product.govtCode || "",
-      price: product.price,
+      price: product.price || "",
     });
     setEditingProduct(product);
     setActiveTab("add");
@@ -123,14 +125,7 @@ const Inventory = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (
-      !form.name ||
-      !form.size ||
-      !form.subCategory ||
-      !form.price ||
-      !form.govtCode
-    ) {
-      console.log(form.govtCode);
+    if (!form.name || !form.size || !form.subCategory || !form.govtCode) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -154,11 +149,23 @@ const Inventory = () => {
     }
   };
 
-  // Filter and group products
+  // All unique subCategories from loaded products for filter dropdown
+  const allSubCategories = [
+    ...new Set(products.map((p) => p.subCategory).filter(Boolean)),
+  ].sort();
+
+  // Filter and search products
   const filtered = products.filter((p) => {
-    const typeMatch = filterType === "ALL" || p.productType === filterType;
-    const sizeMatch = filterSize === "ALL" || p.size === filterSize;
-    return typeMatch && sizeMatch;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      p.name?.toLowerCase().includes(q) ||
+      p.govtCode?.toLowerCase().includes(q);
+    const matchesType = filterType === "ALL" || p.productType === filterType;
+    const matchesSize = filterSize === "ALL" || p.size === filterSize;
+    const matchesSubCat =
+      filterSubCategory === "ALL" || p.subCategory === filterSubCategory;
+    return matchesSearch && matchesType && matchesSize && matchesSubCat;
   });
 
   const grouped = filtered.reduce((acc, product) => {
@@ -252,21 +259,119 @@ const Inventory = () => {
       {/* ── Tab: Product List ── */}
       {activeTab === "list" && (
         <div>
-          {/* Filters Row */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "20px",
-              flexWrap: "wrap",
-              gap: "10px",
-            }}
-          >
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {/* ── Search Bar ── */}
+          <div style={{ marginBottom: "14px", position: "relative" }}>
+            <span
+              style={{
+                position: "absolute",
+                left: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: "16px",
+                pointerEvents: "none",
+              }}
+            >
+              🔍
+            </span>
+            <input
+              type="text"
+              placeholder="Search by brand name or govt code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                ...inputStyle,
+                paddingLeft: "38px",
+                paddingRight: searchQuery ? "36px" : "12px",
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: colors.textSub,
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  lineHeight: 1,
+                  padding: "2px",
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* ── Filters Row ── */}
+          {isMobile ? (
+            // Mobile: stacked rows
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                <select
+                  value={filterType}
+                  onChange={(e) => { setFilterType(e.target.value); setFilterSubCategory("ALL"); }}
+                  style={{ ...inputStyle, flex: 1 }}
+                >
+                  <option value="ALL">All Types</option>
+                  <option value="IMFL">IMFL</option>
+                  <option value="BEER">Beer</option>
+                </select>
+                <select
+                  value={filterSubCategory}
+                  onChange={(e) => setFilterSubCategory(e.target.value)}
+                  style={{ ...inputStyle, flex: 1 }}
+                >
+                  <option value="ALL">All Spirits</option>
+                  {allSubCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <select
+                  value={filterSize}
+                  onChange={(e) => setFilterSize(e.target.value)}
+                  style={{ ...inputStyle, flex: 1 }}
+                >
+                  <option value="ALL">All Sizes</option>
+                  {sizes.map((s) => (
+                    <option key={s._id} value={s.value}>{s.value}</option>
+                  ))}
+                </select>
+                {(filterType !== "ALL" || filterSize !== "ALL" || filterSubCategory !== "ALL" || searchQuery) && (
+                  <button
+                    onClick={() => { setFilterType("ALL"); setFilterSize("ALL"); setFilterSubCategory("ALL"); setSearchQuery(""); }}
+                    style={{
+                      padding: "10px 14px",
+                      backgroundColor: colors.danger + "15",
+                      color: colors.danger,
+                      border: `1px solid ${colors.danger}40`,
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Clear ✕
+                  </button>
+                )}
+              </div>
+              <div style={{ marginTop: "10px", fontSize: "13px", color: colors.textSub, fontWeight: "500" }}>
+                {filtered.length} products
+              </div>
+            </div>
+          ) : (
+            // Desktop: everything in one line
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => { setFilterType(e.target.value); setFilterSubCategory("ALL"); }}
                 style={{ ...inputStyle, width: "auto", minWidth: "120px" }}
               >
                 <option value="ALL">All Types</option>
@@ -274,33 +379,50 @@ const Inventory = () => {
                 <option value="BEER">Beer</option>
               </select>
               <select
+                value={filterSubCategory}
+                onChange={(e) => setFilterSubCategory(e.target.value)}
+                style={{ ...inputStyle, width: "auto", minWidth: "140px" }}
+              >
+                <option value="ALL">All Spirits</option>
+                {allSubCategories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <select
                 value={filterSize}
                 onChange={(e) => setFilterSize(e.target.value)}
                 style={{ ...inputStyle, width: "auto", minWidth: "120px" }}
               >
                 <option value="ALL">All Sizes</option>
-                {sizes
-                  .filter((s) => s.meta?.productType === form.productType)
-                  .map((s) => (
-                    <option key={s._id} value={s.value}>
-                      {s.value}
-                    </option>
-                  ))}
+                {sizes.map((s) => (
+                  <option key={s._id} value={s.value}>{s.value}</option>
+                ))}
               </select>
+              {(filterType !== "ALL" || filterSize !== "ALL" || filterSubCategory !== "ALL" || searchQuery) && (
+                <button
+                  onClick={() => { setFilterType("ALL"); setFilterSize("ALL"); setFilterSubCategory("ALL"); setSearchQuery(""); }}
+                  style={{
+                    padding: "8px 12px",
+                    backgroundColor: colors.danger + "15",
+                    color: colors.danger,
+                    border: `1px solid ${colors.danger}40`,
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Clear ✕
+                </button>
+              )}
+              <div style={{ marginLeft: "auto", fontSize: "13px", color: colors.textSub, fontWeight: "500", whiteSpace: "nowrap" }}>
+                {filtered.length} products
+              </div>
             </div>
+          )}
 
-            <div
-              style={{
-                fontSize: "13px",
-                color: colors.textSub,
-                fontWeight: "500",
-              }}
-            >
-              {filtered.length} products
-            </div>
-          </div>
-
-          {/* Product Groups */}
+          {/* ── Product Groups ── */}
           {Object.keys(grouped).length === 0 ? (
             <div
               style={{
@@ -310,28 +432,62 @@ const Inventory = () => {
               }}
             >
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>🍾</div>
-              <p style={{ fontSize: "16px", color: colors.text }}>
-                No products yet
-              </p>
-              <p style={{ fontSize: "13px", marginTop: "8px" }}>
-                Click "Add Product" tab to get started
-              </p>
-              <button
-                onClick={() => setActiveTab("add")}
-                style={{
-                  marginTop: "16px",
-                  padding: "10px 24px",
-                  backgroundColor: colors.accent,
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                }}
-              >
-                + Add First Product
-              </button>
+              {products.length === 0 ? (
+                <>
+                  <p style={{ fontSize: "16px", color: colors.text }}>
+                    No products yet
+                  </p>
+                  <p style={{ fontSize: "13px", marginTop: "8px" }}>
+                    Click "Add Product" tab to get started
+                  </p>
+                  <button
+                    onClick={() => setActiveTab("add")}
+                    style={{
+                      marginTop: "16px",
+                      padding: "10px 24px",
+                      backgroundColor: colors.accent,
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Add First Product
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: "16px", color: colors.text }}>
+                    No results found
+                  </p>
+                  <p style={{ fontSize: "13px", marginTop: "8px" }}>
+                    Try adjusting your search or filters
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterType("ALL");
+                      setFilterSize("ALL");
+                      setFilterSubCategory("ALL");
+                    }}
+                    style={{
+                      marginTop: "16px",
+                      padding: "10px 24px",
+                      backgroundColor: colors.accent,
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             Object.entries(grouped)
@@ -416,7 +572,7 @@ const Inventory = () => {
                                     marginBottom: "8px",
                                   }}
                                 >
-                                  <div>
+                                  <div style={{ flex: 1, marginRight: "8px" }}>
                                     <div
                                       style={{
                                         fontWeight: "600",
@@ -436,15 +592,28 @@ const Inventory = () => {
                                       {product.subCategory}
                                     </div>
                                   </div>
-                                  <div
-                                    style={{
-                                      fontWeight: "600",
-                                      color: colors.text,
-                                      fontSize: "15px",
-                                    }}
-                                  >
-                                    ₹{product.price}
-                                  </div>
+                                  {product.price ? (
+                                    <div
+                                      style={{
+                                        fontWeight: "600",
+                                        color: colors.text,
+                                        fontSize: "15px",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      ₹{product.price}
+                                    </div>
+                                  ) : (
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        color: colors.textSub,
+                                        fontStyle: "italic",
+                                      }}
+                                    >
+                                      No price
+                                    </div>
+                                  )}
                                 </div>
                                 <div
                                   style={{
@@ -522,10 +691,10 @@ const Inventory = () => {
                                     borderBottom: `1px solid ${colors.border}`,
                                   }}
                                 >
-                                  {[ "Govt Code",
+                                  {[
+                                    "Govt Code",
                                     "Brand",
                                     "Spirit Type",
-                                   
                                     "Btl/Case",
                                     "Price",
                                     "Actions",
@@ -561,6 +730,15 @@ const Inventory = () => {
                                     <td
                                       style={{
                                         padding: "12px 14px",
+                                        color: colors.textSub,
+                                        fontFamily: "monospace",
+                                      }}
+                                    >
+                                      {product.govtCode || "—"}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: "12px 14px",
                                         color: colors.text,
                                         fontWeight: "500",
                                       }}
@@ -579,15 +757,6 @@ const Inventory = () => {
                                       style={{
                                         padding: "12px 14px",
                                         color: colors.textSub,
-                                        fontFamily: "monospace",
-                                      }}
-                                    >
-                                      {product.govtCode || "—"}
-                                    </td>
-                                    <td
-                                      style={{
-                                        padding: "12px 14px",
-                                        color: colors.textSub,
                                       }}
                                     >
                                       {product.bottlesPerCase}
@@ -595,11 +764,18 @@ const Inventory = () => {
                                     <td
                                       style={{
                                         padding: "12px 14px",
-                                        color: colors.text,
-                                        fontWeight: "500",
+                                        color: product.price
+                                          ? colors.text
+                                          : colors.textSub,
+                                        fontWeight: product.price
+                                          ? "500"
+                                          : "400",
+                                        fontStyle: product.price
+                                          ? "normal"
+                                          : "italic",
                                       }}
                                     >
-                                      ₹{product.price}
+                                      {product.price ? `₹${product.price}` : "—"}
                                     </td>
                                     <td style={{ padding: "12px 14px" }}>
                                       <div
@@ -657,11 +833,7 @@ const Inventory = () => {
 
       {/* ── Tab: Add / Edit Product ── */}
       {activeTab === "add" && (
-        <div
-          style={{
-            maxWidth: "600px",
-          }}
-        >
+        <div style={{ maxWidth: "700px", width: "100%", margin: "auto", paddingTop: "40px", paddingBottom: "40px" }}>
           <form onSubmit={handleSubmit}>
             <div
               style={{
@@ -844,11 +1016,11 @@ const Inventory = () => {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Price per Bottle (₹) *</label>
+                  <label style={labelStyle}>Price per Bottle (₹)</label>
                   <input
                     style={inputStyle}
                     type="number"
-                    placeholder="e.g. 120"
+                    placeholder="Optional"
                     value={form.price}
                     onChange={(e) =>
                       setForm({ ...form, price: e.target.value })
